@@ -117,6 +117,7 @@ export const TIME_RANGES = [
 
 // Number formatting helpers
 export function formatUSD(value: number, compact = true): string {
+  if (value == null || isNaN(value)) return '$0.00';
   if (compact) {
     if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
     if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;

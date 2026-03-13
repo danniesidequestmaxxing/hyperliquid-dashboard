@@ -39,7 +39,7 @@ export function BridgeTVLChart({ data }: { data: DataPoint[] }) {
   }, [data, range]);
 
   const latest = filtered[filtered.length - 1];
-  const totalTVL = latest ? protocols.reduce((s, p) => s + (latest[p.key as keyof DataPoint] as number), 0) : 0;
+  const totalTVL = latest ? protocols.reduce((s, p) => s + (Number(latest[p.key as keyof DataPoint]) || 0), 0) : 0;
 
   return (
     <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
@@ -54,7 +54,7 @@ export function BridgeTVLChart({ data }: { data: DataPoint[] }) {
       {/* Legend with current values */}
       <div className="flex flex-wrap gap-4 mb-3">
         {latest && protocols.map(p => {
-          const val = latest[p.key as keyof DataPoint] as number;
+          const val = Number(latest[p.key as keyof DataPoint]) || 0;
           const share = totalTVL > 0 ? (val / totalTVL) * 100 : 0;
           return (
             <div key={p.key} className="flex items-center gap-1.5">
