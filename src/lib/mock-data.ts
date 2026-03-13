@@ -237,6 +237,7 @@ export function generateSupplyData() {
     return {
       month,
       unlocks,
+      grossUnlocks: unlocks,
       unlocksUsd: unlocks * avgPrice,
       buybacks,
       buybacksUsd: buybackUsd,

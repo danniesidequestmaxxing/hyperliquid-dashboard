@@ -45,6 +45,36 @@ export const SUPPLY_PARAMS = {
   NEUTRALIZATION_REV: 2_600_000_000,
 } as const;
 
+// Sell-through scenarios — team restakes most unlocks, only ~10-15% historically sold
+export const SELL_THROUGH_SCENARIOS = {
+  base: {
+    label: 'Base Case',
+    shortLabel: 'Base',
+    rate: 0.15,
+    description: 'Team historically sells ~10-15%, rest restaked',
+  },
+  bear: {
+    label: 'Bear Case',
+    shortLabel: 'Bear',
+    rate: 0.50,
+    description: 'Conservative: 50% of unlocks hit the market',
+  },
+  worst: {
+    label: 'Worst Case',
+    shortLabel: 'Worst',
+    rate: 1.00,
+    description: 'All unlocks sold — maximum dilution scenario',
+  },
+} as const;
+
+export type SellThroughScenario = keyof typeof SELL_THROUGH_SCENARIOS;
+export const DEFAULT_SCENARIO: SellThroughScenario = 'bear';
+
+/** Neutralization revenue scales with sell-through rate */
+export function getNeutralizationRevenue(sellThroughRate: number): number {
+  return SUPPLY_PARAMS.NEUTRALIZATION_REV * sellThroughRate;
+}
+
 // Peer valuation multiples for overlay (from Caladan comps analysis)
 export const PEER_MULTIPLES = {
   lighter: { name: 'Lighter', multiple: 24, impliedPrice: 17.1, color: '#a855f7' },

@@ -1,11 +1,12 @@
 'use client';
 
-import { formatUSD } from '@/lib/constants';
+import { formatUSD, formatNumber, SUPPLY_PARAMS } from '@/lib/constants';
 
 interface Props {
   currentRevenue: number;
   requiredRevenue: number;
   neutralizationPct: number;
+  sellThroughRate: number;
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -20,7 +21,7 @@ function describeArc(cx: number, cy: number, r: number, startAngle: number, endA
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
 }
 
-export function BuybackGauge({ currentRevenue, requiredRevenue, neutralizationPct }: Props) {
+export function BuybackGauge({ currentRevenue, requiredRevenue, neutralizationPct, sellThroughRate }: Props) {
   const pct = Math.min(Math.max(neutralizationPct, 0), 100);
 
   // Arc spans from -90° (left) to 90° (right) — a 180° semicircle
@@ -45,11 +46,14 @@ export function BuybackGauge({ currentRevenue, requiredRevenue, neutralizationPc
   const needleAngle = startAngle + (pct / 100) * (endAngle - startAngle);
   const needleEnd = polarToCartesian(cx, cy, r - 10, needleAngle);
 
+  const effectiveMonthlyHype = SUPPLY_PARAMS.MONTHLY_UNLOCK_HYPE * sellThroughRate;
+  const isFullyNeutralized = neutralizationPct >= 100;
+
   return (
     <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
       <div className="mb-4">
         <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Buyback Neutralization</h3>
-        <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">Revenue needed to fully offset employee unlocks</p>
+        <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">Revenue needed to offset effective sell pressure</p>
       </div>
 
       <div className="flex flex-col items-center">
@@ -129,19 +133,39 @@ export function BuybackGauge({ currentRevenue, requiredRevenue, neutralizationPc
             <span className="text-[#e2e2e8] font-semibold">{formatUSD(currentRevenue)}/yr</span>
           </div>
           <div className="flex items-center justify-between text-[10px] font-mono">
-            <span className="text-[#8888a0]">Needed to neutralize</span>
+            <span className="text-[#8888a0]">Needed ({(sellThroughRate * 100).toFixed(0)}%)</span>
             <span className="text-[#e2e2e8] font-semibold">{formatUSD(requiredRevenue)}/yr</span>
           </div>
-          <div className="flex items-center justify-between text-[10px] font-mono">
-            <span className="text-[#8888a0]">Revenue gap</span>
-            <span className="text-[#ef4444] font-semibold">{formatUSD(requiredRevenue - currentRevenue)}/yr</span>
-          </div>
+          {sellThroughRate < 1 && (
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="text-[#8888a0]">Needed (100%)</span>
+              <span className="text-[#8888a0]">{formatUSD(SUPPLY_PARAMS.NEUTRALIZATION_REV)}/yr</span>
+            </div>
+          )}
+          {!isFullyNeutralized && (
+            <div className="flex items-center justify-between text-[10px] font-mono">
+              <span className="text-[#8888a0]">Revenue gap</span>
+              <span className="text-[#ef4444] font-semibold">{formatUSD(requiredRevenue - currentRevenue)}/yr</span>
+            </div>
+          )}
         </div>
 
         <p className="text-[10px] font-mono text-[#8888a0] text-center mt-3 leading-relaxed">
-          At current revenue, buybacks offset <span className="text-[#e2e2e8] font-semibold">{pct.toFixed(0)}%</span> of
-          the <span className="text-[#e2e2e8]">10M HYPE/month</span> employee unlock pressure.
-          Revenue needs to grow <span className="text-[#ef4444] font-semibold">{((requiredRevenue / Math.max(currentRevenue, 1)) - 1).toFixed(1)}x</span> to fully neutralize.
+          {isFullyNeutralized ? (
+            <>
+              <span className="text-[#22c55e] font-semibold">Buybacks fully neutralize</span> the{' '}
+              <span className="text-[#e2e2e8]">{formatNumber(effectiveMonthlyHype)} HYPE/month</span> effective sell pressure
+              <span className="text-[#8888a0]"> ({(sellThroughRate * 100).toFixed(0)}% of {formatNumber(SUPPLY_PARAMS.MONTHLY_UNLOCK_HYPE)} gross unlocks)</span>.
+              Protocol is effectively <span className="text-[#22c55e] font-semibold">deflationary</span> at this sell-through rate.
+            </>
+          ) : (
+            <>
+              At current revenue, buybacks offset <span className="text-[#e2e2e8] font-semibold">{pct.toFixed(0)}%</span> of
+              the <span className="text-[#e2e2e8]">{formatNumber(effectiveMonthlyHype)} HYPE/month</span> effective sell pressure
+              <span className="text-[#8888a0]"> ({(sellThroughRate * 100).toFixed(0)}% of {formatNumber(SUPPLY_PARAMS.MONTHLY_UNLOCK_HYPE)} gross)</span>.
+              Revenue needs to grow <span className="text-[#ef4444] font-semibold">{((requiredRevenue / Math.max(currentRevenue, 1)) - 1).toFixed(1)}x</span> to fully neutralize.
+            </>
+          )}
         </p>
       </div>
     </div>

@@ -13,11 +13,12 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { ChartTooltip } from './ChartTooltip';
-import { formatNumber, formatUSD } from '@/lib/constants';
+import { formatNumber } from '@/lib/constants';
 
 interface DataPoint {
   month: string;
   unlocks: number;
+  grossUnlocks: number;
   buybacks: number;
   netChange: number;
   cumulativeNetChange: number;
@@ -35,6 +36,9 @@ export function SupplyPressureChart({ data }: { data: DataPoint[] }) {
     return data.slice(-months);
   }, [data, range]);
 
+  // Check if we have a scenario active (effective !== gross)
+  const hasScenario = filtered.some(d => d.unlocks !== d.grossUnlocks);
+
   // Split historical vs projected for the cumulative line
   const historicalData = useMemo(() =>
     filtered.map(d => d.isProjected ? { ...d, cumulativeHistorical: undefined } : { ...d, cumulativeHistorical: d.cumulativeNetChange }),
@@ -42,7 +46,6 @@ export function SupplyPressureChart({ data }: { data: DataPoint[] }) {
   );
   const projectedData = useMemo(() =>
     filtered.map((d, i) => {
-      // Include the last historical point for line continuity
       const prev = i > 0 ? filtered[i - 1] : null;
       if (d.isProjected || (prev && filtered[i + 1]?.isProjected)) {
         return { ...d, cumulativeProjected: d.cumulativeNetChange };
@@ -64,7 +67,11 @@ export function SupplyPressureChart({ data }: { data: DataPoint[] }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Supply Pressure: Unlocks vs Buybacks</h3>
-          <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">Monthly employee unlocks (red) vs protocol buybacks (green) | Cumulative net change (line)</p>
+          <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">
+            {hasScenario
+              ? 'Effective sell pressure (red) vs protocol buybacks (green) | Gross unlock shown faded'
+              : 'Monthly employee unlocks (red) vs protocol buybacks (green) | Cumulative net change (line)'}
+          </p>
         </div>
         <div className="flex items-center gap-0.5 rounded-md bg-[#0a0a0f] p-0.5 border border-[#1e1e2e]">
           {ranges.map((r) => (
@@ -127,7 +134,28 @@ export function SupplyPressureChart({ data }: { data: DataPoint[] }) {
 
             <ReferenceLine yAxisId="cumulative" y={0} stroke="#8888a0" strokeDasharray="4 4" strokeWidth={1} strokeOpacity={0.5} />
 
-            <Bar yAxisId="tokens" dataKey="unlocks" name="Monthly Unlocks" fill="#ef4444" fillOpacity={0.3} radius={[2, 2, 0, 0]} />
+            {/* Gross unlocks — faded background bar (only when scenario active) */}
+            {hasScenario && (
+              <Bar
+                yAxisId="tokens"
+                dataKey="grossUnlocks"
+                name="Gross Unlocks"
+                fill="#ef4444"
+                fillOpacity={0.08}
+                radius={[2, 2, 0, 0]}
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* Effective sell pressure (or full unlocks at 100%) */}
+            <Bar
+              yAxisId="tokens"
+              dataKey="unlocks"
+              name={hasScenario ? 'Effective Sell Pressure' : 'Monthly Unlocks'}
+              fill="#ef4444"
+              fillOpacity={0.3}
+              radius={[2, 2, 0, 0]}
+            />
             <Bar yAxisId="tokens" dataKey="buybacks" name="Monthly Buybacks" fill="#22c55e" fillOpacity={0.3} radius={[2, 2, 0, 0]} />
 
             <Line
@@ -159,9 +187,15 @@ export function SupplyPressureChart({ data }: { data: DataPoint[] }) {
 
       {/* Legend */}
       <div className="flex items-center gap-4 mt-3 text-[10px] font-mono text-[#8888a0]">
+        {hasScenario && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-2 rounded-sm bg-[#ef4444]/10 border border-[#ef4444]/20" />
+            <span>Gross Unlocks</span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-2 rounded-sm bg-[#ef4444]/30" />
-          <span>Unlocks</span>
+          <span>{hasScenario ? 'Effective Sell Pressure' : 'Unlocks'}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-2 rounded-sm bg-[#22c55e]/30" />

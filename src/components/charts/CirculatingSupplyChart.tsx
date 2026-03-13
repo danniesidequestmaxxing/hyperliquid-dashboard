@@ -18,11 +18,17 @@ import { SUPPLY_PARAMS, formatNumber, formatUSD } from '@/lib/constants';
 interface SupplyPoint {
   month: string;
   circulatingSupply: number;
+  grossCirculatingSupply?: number;
   avgPrice: number;
   isProjected: boolean;
 }
 
-export function CirculatingSupplyChart({ data }: { data: SupplyPoint[] }) {
+interface Props {
+  data: SupplyPoint[];
+  showGrossOverlay?: boolean;
+}
+
+export function CirculatingSupplyChart({ data, showGrossOverlay = false }: Props) {
   // Merge into chart-friendly format
   const chartData = useMemo(() =>
     data.map(d => ({
@@ -30,9 +36,10 @@ export function CirculatingSupplyChart({ data }: { data: SupplyPoint[] }) {
       supply: d.circulatingSupply,
       supplyHistorical: d.isProjected ? undefined : d.circulatingSupply,
       supplyProjected: d.isProjected ? d.circulatingSupply : undefined,
+      grossSupply: showGrossOverlay && d.grossCirculatingSupply ? d.grossCirculatingSupply : undefined,
       price: d.avgPrice,
     })),
-    [data]
+    [data, showGrossOverlay]
   );
 
   // Ensure the last historical point is also in projected for continuity
@@ -45,7 +52,11 @@ export function CirculatingSupplyChart({ data }: { data: SupplyPoint[] }) {
     <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
       <div className="mb-4">
         <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Circulating Supply & Price</h3>
-        <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">Supply growth from unlocks (area) | HYPE price with AF cost basis (line)</p>
+        <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">
+          {showGrossOverlay
+            ? 'Effective supply growth (area) | Gross 100% trajectory (dashed) | Price overlay'
+            : 'Supply growth from unlocks (area) | HYPE price with AF cost basis (line)'}
+        </p>
       </div>
 
       <div className="h-[280px]">
@@ -102,6 +113,22 @@ export function CirculatingSupplyChart({ data }: { data: SupplyPoint[] }) {
                 fontFamily: 'var(--font-geist-mono)',
               }}
             />
+
+            {/* Gross supply trajectory overlay (100% sell-through) */}
+            {showGrossOverlay && (
+              <Line
+                yAxisId="supply"
+                type="monotone"
+                dataKey="grossSupply"
+                name="Supply (100% Sell-Through)"
+                stroke="#ef4444"
+                strokeWidth={1}
+                strokeDasharray="4 4"
+                strokeOpacity={0.35}
+                dot={false}
+                connectNulls
+              />
+            )}
 
             {/* Historical supply area */}
             <Area
