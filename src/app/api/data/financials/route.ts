@@ -8,23 +8,26 @@ const HYPE_CIRC_RATIO = 0.336; // ~33.6% circulating
 
 export async function GET() {
   try {
-    const [fees, perpVol, spotVol, prices] = await Promise.allSettled([
+    const [fees, perpVol, spotVol, prices, btcPrices] = await Promise.allSettled([
       fetchFeeHistory('hyperliquid'),
       fetchDerivativesVolumeHistory('hyperliquid'),
       fetchDexVolumeHistory('hyperliquid'),
       fetchPriceHistory('hyperliquid', 400),
+      fetchPriceHistory('bitcoin', 400),
     ]);
 
     const feeData = fees.status === 'fulfilled' ? fees.value : [];
     const perpData = perpVol.status === 'fulfilled' ? perpVol.value : [];
     const spotData = spotVol.status === 'fulfilled' ? spotVol.value : [];
     const priceData = prices.status === 'fulfilled' ? prices.value : [];
+    const btcData = btcPrices.status === 'fulfilled' ? btcPrices.value : [];
 
     // Build lookup maps by date string
     const feeMap = new Map(feeData.map(d => [tsToDate(d.timestamp), d.value]));
     const perpMap = new Map(perpData.map(d => [tsToDate(d.timestamp), d.value]));
     const spotMap = new Map(spotData.map(d => [tsToDate(d.timestamp), d.value]));
     const priceMap = new Map(priceData.map(d => [tsToDate(d.timestamp), d.price]));
+    const btcMap = new Map(btcData.map(d => [tsToDate(d.timestamp), d.price]));
 
     // Use fees as the base date set (most complete for our needs)
     const allDates = new Set([...feeMap.keys(), ...perpMap.keys()]);
@@ -59,6 +62,7 @@ export async function GET() {
         fdv_multiple: fdvMultiple,
         open_interest: 0, // Filled from health endpoint
         hype_price: price,
+        btc_price: btcMap.get(date) || findClosestPrice(date, btcMap),
         market_cap: price * HYPE_TOTAL_SUPPLY * HYPE_CIRC_RATIO,
       };
     });

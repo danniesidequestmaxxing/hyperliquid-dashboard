@@ -66,7 +66,7 @@ function scoreValuation(currentMultiple: number, historicalMultiples: number[]):
   return {
     name: 'Valuation (FDV/Fees)',
     score,
-    weight: 0.30,
+    weight: 0.25,
     signal: scoreToSignal(score),
     detail,
     value: `${currentMultiple.toFixed(1)}x`,
@@ -180,7 +180,7 @@ function scoreCatalyst(
   operatorCounts: number[],
 ): FactorScore {
   if (hip3FeeContributions.length < 30) {
-    return { name: 'HIP-3 Catalyst', score: 0, weight: 0.15, signal: 'HOLD', detail: 'Insufficient data', value: 'N/A', threshold: 'Adoption trajectory' };
+    return { name: 'HIP-3 Catalyst', score: 0, weight: 0.10, signal: 'HOLD', detail: 'Insufficient data', value: 'N/A', threshold: 'Adoption trajectory' };
   }
 
   const recentContrib = avg(hip3FeeContributions.slice(-7));
@@ -214,7 +214,7 @@ function scoreCatalyst(
   return {
     name: 'HIP-3 Catalyst',
     score,
-    weight: 0.15,
+    weight: 0.10,
     signal: scoreToSignal(score),
     detail,
     value: `${recentContrib.toFixed(1)}% of fees`,
@@ -222,11 +222,113 @@ function scoreCatalyst(
   };
 }
 
-// ── Factor 5: Volume Trend ──
+// ── Factor 5: Supply Pressure ──
+// Net inflationary/deflationary pressure from unlocks vs buybacks
+function scoreSupplyPressure(neutralizationPct: number, netMonthlyPressure: number): FactorScore {
+  // neutralizationPct: % of unlock supply offset by buybacks (0-100+)
+  // netMonthlyPressure: net HYPE tokens added/removed per month (positive = inflationary)
+
+  let score: number;
+  if (neutralizationPct >= 100) score = 0.8;       // Fully deflationary
+  else if (neutralizationPct >= 75) score = 0.4;    // Mostly offset
+  else if (neutralizationPct >= 50) score = 0.0;    // Half offset
+  else if (neutralizationPct >= 25) score = -0.4;   // Mostly inflationary
+  else score = -0.8;                                  // Heavy dilution
+
+  // Adjust for absolute pressure magnitude
+  const monthlyPressurePct = (netMonthlyPressure / 336_000_000) * 100; // as % of circ supply
+  if (monthlyPressurePct > 3) score -= 0.2;  // >3% monthly inflation is severe
+  else if (monthlyPressurePct < -1) score += 0.2;  // Deflation is positive
+
+  score = clamp(score, -1, 1);
+
+  const direction = netMonthlyPressure > 0 ? 'inflationary' : 'deflationary';
+  const detail = `Buybacks offset ${neutralizationPct.toFixed(0)}% of unlock supply. Net ${direction} pressure of ${Math.abs(netMonthlyPressure / 1e6).toFixed(1)}M HYPE/month (${Math.abs(monthlyPressurePct).toFixed(1)}% of circ supply). ${neutralizationPct >= 50 ? 'Supply dynamics manageable.' : 'Significant dilution headwind.'}`;
+
+  return {
+    name: 'Supply Pressure',
+    score,
+    weight: 0.10,
+    signal: scoreToSignal(score),
+    detail,
+    value: `${neutralizationPct.toFixed(0)}% offset`,
+    threshold: '100% = net neutral',
+  };
+}
+
+// ── Factor 6: BTC Correlation ──
+// High correlation + BTC weakness = bearish; low correlation = independent catalyst story
+function scoreBTCCorrelation(hypeReturns: number[], btcReturns: number[], btcMomentum: number): FactorScore {
+  if (hypeReturns.length < 30 || btcReturns.length < 30) {
+    return { name: 'BTC Regime', score: 0, weight: 0.05, signal: 'HOLD', detail: 'Insufficient data', value: 'N/A', threshold: 'Correlation + BTC trend' };
+  }
+
+  const corr = pearsonCorr(btcReturns.slice(-30), hypeReturns.slice(-30));
+  const beta = computeBetaHelper(btcReturns.slice(-30), hypeReturns.slice(-30));
+
+  let score = 0;
+
+  // If BTC is strong and HYPE is correlated → tailwind
+  if (btcMomentum > 0.05 && corr > 0.5) score = 0.3;
+  // If BTC is weak and HYPE is correlated → headwind
+  else if (btcMomentum < -0.05 && corr > 0.5) score = -0.4;
+  // If HYPE is decoupled → slightly positive (independent story)
+  else if (corr < 0.3) score = 0.2;
+  // High beta amplifies risk
+  else if (beta > 1.5 && btcMomentum < 0) score = -0.3;
+  else score = 0;
+
+  score = clamp(score, -1, 1);
+
+  const corrLabel = corr > 0.6 ? 'highly correlated' : corr > 0.3 ? 'moderately correlated' : 'weakly correlated';
+  const btcDir = btcMomentum > 0 ? 'bullish' : 'bearish';
+  const detail = `HYPE is ${corrLabel} with BTC (ρ=${corr.toFixed(2)}, β=${beta.toFixed(2)}). BTC 30d trend is ${btcDir} (${(btcMomentum * 100).toFixed(1)}%). ${corr > 0.5 && btcMomentum < 0 ? 'High correlation + BTC weakness = headwind.' : corr < 0.3 ? 'Low correlation suggests idiosyncratic drivers.' : 'Monitoring macro regime.'}`;
+
+  return {
+    name: 'BTC Regime',
+    score,
+    weight: 0.05,
+    signal: scoreToSignal(score),
+    detail,
+    value: `ρ=${corr.toFixed(2)} β=${beta.toFixed(1)}`,
+    threshold: 'Correlation + BTC trend',
+  };
+}
+
+function pearsonCorr(x: number[], y: number[]): number {
+  const n = Math.min(x.length, y.length);
+  if (n < 3) return 0;
+  const mx = x.slice(0, n).reduce((s, v) => s + v, 0) / n;
+  const my = y.slice(0, n).reduce((s, v) => s + v, 0) / n;
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < n; i++) {
+    const xd = x[i] - mx;
+    const yd = y[i] - my;
+    num += xd * yd;
+    dx += xd * xd;
+    dy += yd * yd;
+  }
+  return Math.sqrt(dx * dy) > 0 ? num / Math.sqrt(dx * dy) : 0;
+}
+
+function computeBetaHelper(x: number[], y: number[]): number {
+  const n = Math.min(x.length, y.length);
+  if (n < 3) return 0;
+  const mx = x.slice(0, n).reduce((s, v) => s + v, 0) / n;
+  const my = y.slice(0, n).reduce((s, v) => s + v, 0) / n;
+  let cov = 0, varX = 0;
+  for (let i = 0; i < n; i++) {
+    cov += (x[i] - mx) * (y[i] - my);
+    varX += (x[i] - mx) ** 2;
+  }
+  return varX > 0 ? cov / varX : 0;
+}
+
+// ── Factor 7: Volume Trend ──
 // Rising volume confirms price moves
 function scoreVolumeTrend(volumes: number[]): FactorScore {
   if (volumes.length < 30) {
-    return { name: 'Volume Trend', score: 0, weight: 0.10, signal: 'HOLD', detail: 'Insufficient data', value: 'N/A', threshold: '7d vs 30d avg' };
+    return { name: 'Volume Trend', score: 0, weight: 0.05, signal: 'HOLD', detail: 'Insufficient data', value: 'N/A', threshold: '7d vs 30d avg' };
   }
 
   const ma7 = avg(volumes.slice(-7));
@@ -246,7 +348,7 @@ function scoreVolumeTrend(volumes: number[]): FactorScore {
   return {
     name: 'Volume Trend',
     score,
-    weight: 0.10,
+    weight: 0.05,
     signal: scoreToSignal(score),
     detail,
     value: `${volChange >= 0 ? '+' : ''}${(volChange * 100).toFixed(1)}%`,
@@ -256,10 +358,11 @@ function scoreVolumeTrend(volumes: number[]): FactorScore {
 
 // ── Composite Signal ──
 export function computeSignal(data: {
-  financials: { date: string; fdv_multiple: number; hype_price: number; daily_fees: number; total_volume: number }[];
+  financials: { date: string; fdv_multiple: number; hype_price: number; daily_fees: number; total_volume: number; btc_price?: number }[];
   hip3: { hip3_fee_contribution: number; operators: number }[];
+  supply?: { neutralizationPct: number; netMonthlyPressure: number };
 }): CompositeSignal {
-  const { financials, hip3 } = data;
+  const { financials, hip3, supply } = data;
 
   const multiples = financials.map(d => d.fdv_multiple);
   const prices = financials.map(d => d.hype_price);
@@ -270,11 +373,21 @@ export function computeSignal(data: {
 
   const currentMultiple = multiples[multiples.length - 1];
 
+  // BTC correlation data
+  const btcPrices = financials.map(d => d.btc_price || 0).filter(p => p > 0);
+  const hypeReturns = prices.length >= 2 ? prices.slice(1).map((p, i) => (p - prices[i]) / prices[i]) : [];
+  const btcReturns = btcPrices.length >= 2 ? btcPrices.slice(1).map((p, i) => (p - btcPrices[i]) / btcPrices[i]) : [];
+  const btcMomentum = btcPrices.length >= 30
+    ? (btcPrices[btcPrices.length - 1] - btcPrices[btcPrices.length - 30]) / btcPrices[btcPrices.length - 30]
+    : 0;
+
   const factors = [
     scoreValuation(currentMultiple, multiples),
     scoreMomentum(prices),
     scoreFeeGrowth(fees),
     scoreCatalyst(hip3Contribs, operators),
+    scoreSupplyPressure(supply?.neutralizationPct ?? 35, supply?.netMonthlyPressure ?? 7_500_000),
+    scoreBTCCorrelation(hypeReturns, btcReturns, btcMomentum),
     scoreVolumeTrend(volumes),
   ];
 
@@ -304,14 +417,13 @@ export function computeSignal(data: {
 
 // ── Historical Signal Backtest ──
 export function computeHistoricalSignals(financials: {
-  date: string; fdv_multiple: number; hype_price: number; daily_fees: number; total_volume: number;
+  date: string; fdv_multiple: number; hype_price: number; daily_fees: number; total_volume: number; btc_price?: number;
 }[], hip3: { hip3_fee_contribution: number; operators: number }[]): HistoricalSignal[] {
   const signals: HistoricalSignal[] = [];
   const lookback = 90; // Need 90 days of history for proper signals
 
   for (let i = lookback; i < financials.length; i++) {
     const slice = financials.slice(0, i + 1);
-    const hip3Slice = hip3.slice(0, Math.min(i + 1, hip3.length));
 
     const multiples = slice.map(d => d.fdv_multiple);
     const prices = slice.map(d => d.hype_price);
@@ -323,9 +435,13 @@ export function computeHistoricalSignals(financials: {
     const feeScore = scoreFeeGrowth(fees).score;
     const volScore = scoreVolumeTrend(volumes).score;
 
-    const composite = valScore * 0.30 + momScore * 0.20 + feeScore * 0.25 + volScore * 0.10;
-    // Simplified - skip catalyst for backtest perf (use 0 for missing data)
-    const adjustedComposite = composite / 0.85; // Normalize without catalyst weight
+    // Supply pressure (use default estimates for backtest)
+    const supplyScore = scoreSupplyPressure(35, 7_500_000).score;
+
+    const composite = valScore * 0.25 + momScore * 0.20 + feeScore * 0.25 + supplyScore * 0.10 + volScore * 0.05;
+    // Normalize to account for skipped factors (catalyst + BTC)
+    const activeWeight = 0.85;
+    const adjustedComposite = composite / activeWeight;
 
     signals.push({
       date: financials[i].date,

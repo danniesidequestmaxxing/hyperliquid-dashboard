@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 
 const tabs = [
   { label: 'Financials', href: '/dashboard' },
+  { label: 'Supply', href: '/dashboard/supply' },
   { label: 'Signal', href: '/dashboard/signal' },
   { label: 'HIP-3', href: '/dashboard/hip3' },
   { label: 'Competition', href: '/dashboard/competitive' },

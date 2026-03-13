@@ -7,10 +7,11 @@ import { generateCompetitorData, generateTVLData, getCompetitorTable } from '@/l
 import { useApiData } from '@/lib/use-api-data';
 
 interface CompetitorApiData {
-  table: { name: string; type: 'CEX' | 'DEX'; volume24h: number; volume30d: number; fees24h: number; takeRate: number; color: string }[];
+  table: { name: string; type: 'CEX' | 'DEX'; volume24h: number; volume30d: number; fees24h: number; takeRate: number; color: string; fdv?: number; fdvRevenueMultiple?: number; impliedHLPrice?: number }[];
   tvlHistory: Record<string, string | number>[];
   hlVolHistory: { date: string; Hyperliquid: number }[];
   competitorSnapshot: { name: string; volume24h: number; type: string }[];
+  hypePrice?: number;
 }
 
 export default function CompetitivePage() {
@@ -31,7 +32,7 @@ export default function CompetitivePage() {
   );
 
   // Use real table data if available, otherwise mock
-  const tableData = apiData?.table || getCompetitorTable();
+  const tableData = apiData?.table && apiData.table.length > 0 ? apiData.table : getCompetitorTable();
   // Historical TVL/competitor volumes need daily DB snapshots; using mock for charts
   const tvlData = mockTvlData;
   const shareData = mockShareData;
@@ -42,7 +43,7 @@ export default function CompetitivePage() {
     <div className="space-y-4">
       <MarketShareChart data={shareData} />
       <BridgeTVLChart data={tvlData} />
-      <CompetitorTable data={tableData} />
+      <CompetitorTable data={tableData} hypePrice={apiData?.hypePrice} />
     </div>
   );
 }

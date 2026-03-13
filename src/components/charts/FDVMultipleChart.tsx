@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import { TimeRangeSelector } from './TimeRangeSelector';
 import { ChartTooltip } from './ChartTooltip';
-import { BENCHMARKS, formatMultiple } from '@/lib/constants';
+import { BENCHMARKS, PEER_MULTIPLES, formatMultiple } from '@/lib/constants';
 
 interface DataPoint {
   date: string;
@@ -30,7 +30,8 @@ export function FDVMultipleChart({ data }: { data: DataPoint[] }) {
     return data.slice(-days);
   }, [data, range]);
 
-  const yMin = Math.floor(Math.min(...filtered.map(d => d.fdv_multiple)) - 2);
+  const rawMin = Math.min(...filtered.map(d => d.fdv_multiple));
+  const yMin = Math.min(Math.floor(rawMin - 2), PEER_MULTIPLES.aster.multiple - 2);
   const yMax = Math.ceil(Math.max(...filtered.map(d => d.fdv_multiple)) + 2);
 
   return (
@@ -84,6 +85,35 @@ export function FDVMultipleChart({ data }: { data: DataPoint[] }) {
                 position: 'right',
                 fill: '#6366f1',
                 fontSize: 10,
+                fontFamily: 'var(--font-geist-mono)',
+              }}
+            />
+
+            <ReferenceLine
+              y={PEER_MULTIPLES.lighter.multiple}
+              stroke={PEER_MULTIPLES.lighter.color}
+              strokeDasharray="6 4"
+              strokeWidth={1}
+              strokeOpacity={0.6}
+              label={{
+                value: `Lighter ${PEER_MULTIPLES.lighter.multiple}x → $${PEER_MULTIPLES.lighter.impliedPrice}`,
+                position: 'right',
+                fill: PEER_MULTIPLES.lighter.color,
+                fontSize: 9,
+                fontFamily: 'var(--font-geist-mono)',
+              }}
+            />
+            <ReferenceLine
+              y={PEER_MULTIPLES.aster.multiple}
+              stroke={PEER_MULTIPLES.aster.color}
+              strokeDasharray="6 4"
+              strokeWidth={1}
+              strokeOpacity={0.6}
+              label={{
+                value: `Aster ${PEER_MULTIPLES.aster.multiple}x → $${PEER_MULTIPLES.aster.impliedPrice}`,
+                position: 'right',
+                fill: PEER_MULTIPLES.aster.color,
+                fontSize: 9,
                 fontFamily: 'var(--font-geist-mono)',
               }}
             />

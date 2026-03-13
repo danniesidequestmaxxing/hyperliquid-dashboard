@@ -33,6 +33,24 @@ export const BENCHMARKS = {
   PERP_DEX_MULTIPLE_RANGE: { low: 2, high: 29 }, // dYdX to GMX range
 } as const;
 
+// Token supply & buyback parameters (from Caladan research memo, Jan 2026)
+export const SUPPLY_PARAMS = {
+  TOTAL_SUPPLY: 1_000_000_000,
+  INITIAL_CIRCULATING: 336_000_000,
+  MONTHLY_UNLOCK_HYPE: 10_000_000,
+  ANNUAL_UNLOCK_HYPE: 119_000_000,
+  UNLOCK_START: '2025-11',
+  BUYBACK_REVENUE_PCT: 0.99,
+  AF_COST_BASIS: 23.61,
+  NEUTRALIZATION_REV: 2_600_000_000,
+} as const;
+
+// Peer valuation multiples for overlay (from Caladan comps analysis)
+export const PEER_MULTIPLES = {
+  lighter: { name: 'Lighter', multiple: 24, impliedPrice: 17.1, color: '#a855f7' },
+  aster: { name: 'Aster', multiple: 15, impliedPrice: 10.7, color: '#f59e0b' },
+} as const;
+
 // DefiLlama protocol slugs
 export const PROTOCOL_SLUGS = {
   hyperliquid: { slug: 'hyperliquid', name: 'Hyperliquid', color: COLORS.hyperliquid },

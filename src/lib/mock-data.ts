@@ -32,6 +32,7 @@ export function generateFinancialsData(days = 365) {
   // Generate FDV/fees multiple directly as random walk around 24.5x benchmark
   const multiples = randomWalk(24.5, days, 0.03);
   const oi = randomWalk(7.5e9, days, 0.06);
+  const btcPrices = randomWalk(85000, days, 0.04, 0.001);
 
   return dates.map((date, i) => {
     const totalVolume = volumes[i];
@@ -61,6 +62,7 @@ export function generateFinancialsData(days = 365) {
       fdv_multiple: fdvMultiple,
       open_interest: oi[i],
       hype_price: currentFdv / 1e9,
+      btc_price: btcPrices[i],
     };
   });
 }
@@ -193,12 +195,91 @@ export function getCompetitorTable() {
     { name: 'OKX', type: 'CEX' as const, volume24h: 12e9, volume30d: 340e9, fees24h: 4.8e6, takeRate: 4.00, color: '#FFFFFF' },
     { name: 'Bitget', type: 'CEX' as const, volume24h: 8e9, volume30d: 225e9, fees24h: 3.2e6, takeRate: 4.00, color: '#00C8B5' },
     { name: 'Gate.io', type: 'CEX' as const, volume24h: 4e9, volume30d: 112e9, fees24h: 1.6e6, takeRate: 4.00, color: '#2354E6' },
-    // DEXs
-    { name: 'Hyperliquid', type: 'DEX' as const, volume24h: 5.2e9, volume30d: 148e9, fees24h: 1.95e6, takeRate: 3.74, color: '#5ae9b5' },
-    { name: 'Aster', type: 'DEX' as const, volume24h: 3.4e9, volume30d: 95e9, fees24h: 0.85e6, takeRate: 2.50, color: '#f59e0b' },
-    { name: 'Lighter', type: 'DEX' as const, volume24h: 2.8e9, volume30d: 82e9, fees24h: 0.13e6, takeRate: 0.46, color: '#a855f7' },
+    // DEXs (with FDV and valuation multiples from Caladan comps table)
+    { name: 'Hyperliquid', type: 'DEX' as const, volume24h: 5.2e9, volume30d: 148e9, fees24h: 1.95e6, takeRate: 3.74, color: '#5ae9b5', fdv: 22e9, fdvRevenueMultiple: 30.9 },
+    { name: 'Aster', type: 'DEX' as const, volume24h: 3.4e9, volume30d: 95e9, fees24h: 0.85e6, takeRate: 2.50, color: '#f59e0b', fdv: 5.06e9, fdvRevenueMultiple: 16.3, impliedHLPrice: 11.6 },
+    { name: 'Lighter', type: 'DEX' as const, volume24h: 2.8e9, volume30d: 82e9, fees24h: 0.13e6, takeRate: 0.46, color: '#a855f7', fdv: 1.79e9, fdvRevenueMultiple: 37.7, impliedHLPrice: 26.8 },
     { name: 'edgeX', type: 'DEX' as const, volume24h: 2.1e9, volume30d: 58e9, fees24h: 0.42e6, takeRate: 2.00, color: '#22d3ee' },
-    { name: 'Jupiter Perps', type: 'DEX' as const, volume24h: 0.9e9, volume30d: 25e9, fees24h: 0.36e6, takeRate: 4.00, color: '#c084fc' },
-    { name: 'Drift', type: 'DEX' as const, volume24h: 0.7e9, volume30d: 19e9, fees24h: 0.28e6, takeRate: 4.00, color: '#fb923c' },
+    { name: 'Jupiter Perps', type: 'DEX' as const, volume24h: 0.9e9, volume30d: 25e9, fees24h: 0.36e6, takeRate: 4.00, color: '#c084fc', fdv: 8.25e9, fdvRevenueMultiple: 62.8, impliedHLPrice: 44.7 },
+    { name: 'Drift', type: 'DEX' as const, volume24h: 0.7e9, volume30d: 19e9, fees24h: 0.28e6, takeRate: 4.00, color: '#fb923c', fdv: 1.53e9, fdvRevenueMultiple: 15.0, impliedHLPrice: 10.7 },
+    { name: 'Vertex', type: 'DEX' as const, volume24h: 0.6e9, volume30d: 17e9, fees24h: 0.12e6, takeRate: 2.00, color: '#10b981', fdv: 0.38e9, fdvRevenueMultiple: 8.7, impliedHLPrice: 6.2 },
+    { name: 'GMX', type: 'DEX' as const, volume24h: 0.5e9, volume30d: 14e9, fees24h: 0.50e6, takeRate: 10.0, color: '#3b82f6', fdv: 0.32e9, fdvRevenueMultiple: 1.8, impliedHLPrice: 1.3 },
+    { name: 'Aevo', type: 'DEX' as const, volume24h: 0.4e9, volume30d: 11e9, fees24h: 0.08e6, takeRate: 2.00, color: '#8b5cf6', fdv: 0.65e9, fdvRevenueMultiple: 22.3, impliedHLPrice: 15.9 },
+    { name: 'Paradex', type: 'DEX' as const, volume24h: 0.3e9, volume30d: 8e9, fees24h: 0.06e6, takeRate: 2.00, color: '#38bdf8' },
   ];
+}
+
+// Supply & Buybacks mock data
+export function generateSupplyData() {
+  const months: string[] = [];
+  const start = new Date(2025, 0, 1); // Jan 2025
+  for (let i = 0; i < 20; i++) { // 20 months (Jan 2025 - Aug 2026)
+    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  let circulatingSupply = 336_000_000;
+  let cumulativeNetChange = 0;
+  const priceWalk = randomWalk(22, months.length, 0.08, 0.01);
+  const feeWalk = randomWalk(60_000_000, months.length, 0.1, 0.005); // ~$60M/month
+
+  const monthly = months.map((month, i) => {
+    const avgPrice = priceWalk[i];
+    const monthFees = feeWalk[i];
+    const unlocks = month >= '2025-11' ? 10_000_000 : 0;
+    const buybackUsd = monthFees * 0.99;
+    const buybacks = avgPrice > 0 ? Math.round(buybackUsd / avgPrice) : 0;
+    const netChange = unlocks - buybacks;
+    cumulativeNetChange += netChange;
+    circulatingSupply += netChange;
+    const isProjected = month > format(new Date(), 'yyyy-MM');
+
+    return {
+      month,
+      unlocks,
+      unlocksUsd: unlocks * avgPrice,
+      buybacks,
+      buybacksUsd: buybackUsd,
+      netChange: Math.round(netChange),
+      cumulativeNetChange: Math.round(cumulativeNetChange),
+      circulatingSupply: Math.round(circulatingSupply),
+      avgPrice,
+      isProjected,
+    };
+  });
+
+  const latestPrice = priceWalk[priceWalk.length - 1];
+  const fees30dMA = feeWalk[feeWalk.length - 1] / 30;
+  const annualizedFees = fees30dMA * 365;
+  const annualBuybackTokens = latestPrice > 0 ? (annualizedFees * 0.99) / latestPrice : 0;
+  const netMonthlyPressure = 10_000_000 - annualBuybackTokens / 12;
+
+  const historicalMonths = monthly.filter(m => !m.isProjected);
+  const lastHist = historicalMonths[historicalMonths.length - 1];
+  const prevHist = historicalMonths[historicalMonths.length - 2];
+
+  // Daily price history
+  const priceDays = randomWalk(18, 365, 0.03, 0.002);
+  const priceHistory = generateDateRange(365).map((date, i) => ({
+    date,
+    price: priceDays[Math.min(i, priceDays.length - 1)],
+  }));
+
+  return {
+    kpis: {
+      circulatingSupply: lastHist?.circulatingSupply || 336_000_000,
+      circulatingChangePct: prevHist
+        ? ((lastHist.circulatingSupply - prevHist.circulatingSupply) / prevHist.circulatingSupply) * 100
+        : 0,
+      monthlyUnlockUsd: 10_000_000 * latestPrice,
+      annualBuybackTokens: Math.round(annualBuybackTokens),
+      netMonthlyPressure: Math.round(netMonthlyPressure),
+      netMonthlyPressureUsd: netMonthlyPressure * latestPrice,
+      neutralizationPct: (annualizedFees / 2_600_000_000) * 100,
+      annualizedRevenue: annualizedFees,
+      hypePrice: latestPrice,
+    },
+    monthly,
+    priceHistory,
+  };
 }

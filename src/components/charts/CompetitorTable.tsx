@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { formatUSD, formatBps, formatPercent } from '@/lib/constants';
+import { formatUSD, formatBps, formatPercent, formatMultiple } from '@/lib/constants';
 
 interface Competitor {
   name: string;
@@ -11,9 +11,12 @@ interface Competitor {
   fees24h: number;
   takeRate: number;
   color: string;
+  fdv?: number;
+  fdvRevenueMultiple?: number;
+  impliedHLPrice?: number;
 }
 
-export function CompetitorTable({ data }: { data: Competitor[] }) {
+export function CompetitorTable({ data, hypePrice }: { data: Competitor[]; hypePrice?: number }) {
   const maxVolume = Math.max(...data.map(d => d.volume24h));
   const totalVolume = data.reduce((s, d) => s + d.volume24h, 0);
 
@@ -62,13 +65,37 @@ export function CompetitorTable({ data }: { data: Competitor[] }) {
         <td className="py-2 px-2 text-right text-xs font-mono font-semibold text-[#e2e2e8] whitespace-nowrap">
           {formatPercent(share)}
         </td>
+        {/* FDV */}
+        <td className="py-2 px-2 text-right text-xs font-mono text-[#e2e2e8]/70 whitespace-nowrap">
+          {row.fdv ? formatUSD(row.fdv) : '—'}
+        </td>
+        {/* FDV/Revenue Multiple */}
+        <td className="py-2 px-2 text-right text-xs font-mono text-[#e2e2e8] whitespace-nowrap">
+          {row.fdvRevenueMultiple ? formatMultiple(row.fdvRevenueMultiple) : '—'}
+        </td>
+        {/* Implied HL Price */}
+        <td className="py-2 px-2 text-right">
+          {row.impliedHLPrice ? (
+            <span className={`text-xs font-mono font-semibold px-1 py-0.5 rounded ${
+              hypePrice && row.impliedHLPrice < hypePrice
+                ? 'text-[#ef4444] bg-[#ef4444]/10'
+                : 'text-[#22c55e] bg-[#22c55e]/10'
+            }`}>
+              ${row.impliedHLPrice.toFixed(1)}
+            </span>
+          ) : row.name === 'Hyperliquid' ? (
+            <span className="text-xs font-mono text-[#8888a0]">—</span>
+          ) : (
+            <span className="text-xs font-mono text-[#8888a0]">—</span>
+          )}
+        </td>
       </tr>
     );
   };
 
   const renderGroupHeader = (label: string) => (
     <tr key={`group-${label}`} className="border-b border-[#1e1e2e]">
-      <td colSpan={6} className="py-2 px-2">
+      <td colSpan={9} className="py-2 px-2">
         <span className="text-[9px] font-mono font-bold text-[#8888a0] uppercase tracking-widest">{label}</span>
       </td>
     </tr>
@@ -78,11 +105,11 @@ export function CompetitorTable({ data }: { data: Competitor[] }) {
     <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
       <div className="mb-4">
         <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Venue Comparison</h3>
-        <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">Volume, fees, and take rate across CEX and DEX venues</p>
+        <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">Volume, fees, take rate, and valuation multiples across CEX and DEX venues</p>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px]">
+        <table className="w-full min-w-[800px]">
           <thead>
             <tr className="border-b border-[#1e1e2e]">
               <th className="text-left py-2 px-2 text-[10px] font-mono font-semibold text-[#8888a0] uppercase tracking-wider w-[120px]">Venue</th>
@@ -91,6 +118,9 @@ export function CompetitorTable({ data }: { data: Competitor[] }) {
               <th className="text-right py-2 px-2 text-[10px] font-mono font-semibold text-[#8888a0] uppercase tracking-wider">24h Fees</th>
               <th className="text-right py-2 px-2 text-[10px] font-mono font-semibold text-[#8888a0] uppercase tracking-wider">Take Rate</th>
               <th className="text-right py-2 px-2 text-[10px] font-mono font-semibold text-[#8888a0] uppercase tracking-wider">Share</th>
+              <th className="text-right py-2 px-2 text-[10px] font-mono font-semibold text-[#8888a0] uppercase tracking-wider">FDV</th>
+              <th className="text-right py-2 px-2 text-[10px] font-mono font-semibold text-[#8888a0] uppercase tracking-wider">FDV/Rev</th>
+              <th className="text-right py-2 px-2 text-[10px] font-mono font-semibold text-[#8888a0] uppercase tracking-wider">HL Implied</th>
             </tr>
           </thead>
           <tbody>

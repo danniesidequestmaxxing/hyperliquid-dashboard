@@ -3,6 +3,8 @@
 import { KPICard } from '@/components/ui/kpi-card';
 import { VolumeFeesChart } from '@/components/charts/VolumeFeesChart';
 import { FDVMultipleChart } from '@/components/charts/FDVMultipleChart';
+import { PriceOverlayChart } from '@/components/charts/PriceOverlayChart';
+import { BTCCorrelationChart } from '@/components/charts/BTCCorrelationChart';
 import { generateFinancialsData } from '@/lib/mock-data';
 import { formatUSD, formatMultiple } from '@/lib/constants';
 import { useApiData } from '@/lib/use-api-data';
@@ -18,6 +20,7 @@ interface FinancialDataPoint {
   fdv_multiple: number;
   open_interest: number;
   hype_price: number;
+  btc_price: number;
 }
 
 export default function FinancialsPage() {
@@ -70,7 +73,11 @@ export default function FinancialsPage() {
       </div>
 
       <VolumeFeesChart data={data} />
-      <FDVMultipleChart data={data} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <FDVMultipleChart data={data} />
+        <PriceOverlayChart data={data} />
+      </div>
+      <BTCCorrelationChart data={data} />
     </div>
   );
 }

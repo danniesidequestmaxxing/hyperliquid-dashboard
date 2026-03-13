@@ -13,7 +13,7 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from 'recharts';
-import { generateFinancialsData, generateHIP3Data } from '@/lib/mock-data';
+import { generateFinancialsData, generateHIP3Data, generateSupplyData } from '@/lib/mock-data';
 import { computeSignal, computeHistoricalSignals, type SignalRating, type FactorScore, type CompositeSignal, type HistoricalSignal } from '@/lib/signal-engine';
 import { formatUSD, formatMultiple } from '@/lib/constants';
 import { ChartTooltip } from '@/components/charts/ChartTooltip';
@@ -45,11 +45,20 @@ export default function SignalPage() {
     '__mock_hip3_signal__',
     () => generateHIP3Data(365),
   );
+  const { data: supplyData } = useApiData(
+    '/api/data/supply',
+    () => generateSupplyData(),
+    300_000
+  );
 
   const signal = useMemo(() => {
     if (!financials || !hip3Data) return null;
-    return computeSignal({ financials, hip3: hip3Data });
-  }, [financials, hip3Data]);
+    const supply = supplyData?.kpis ? {
+      neutralizationPct: supplyData.kpis.neutralizationPct,
+      netMonthlyPressure: supplyData.kpis.netMonthlyPressure,
+    } : undefined;
+    return computeSignal({ financials, hip3: hip3Data, supply });
+  }, [financials, hip3Data, supplyData]);
 
   const historicalSignals = useMemo(() => {
     if (!financials || !hip3Data) return null;
@@ -372,11 +381,13 @@ function HistoricalSignalChart({ data }: { data: HistoricalSignal[] }) {
 // ── Signal Logic Reference ──
 function SignalLogicReference() {
   const rules = [
-    { factor: 'Valuation', buy: 'FDV/Fees < 18x (cheap vs fee generation)', sell: 'FDV/Fees > 30x (overextended)', weight: '30%' },
+    { factor: 'Valuation', buy: 'FDV/Fees < 18x (cheap vs fee generation)', sell: 'FDV/Fees > 30x (overextended)', weight: '25%' },
     { factor: 'Fee Growth', buy: '30d avg fees > 60d avg (accelerating)', sell: '30d avg fees < 60d avg (decelerating)', weight: '25%' },
     { factor: 'Momentum', buy: 'Price above 50d MA, bullish MA cross', sell: 'Price below 50d MA, bearish MA cross', weight: '20%' },
-    { factor: 'HIP-3 Catalyst', buy: 'Rising fee contribution, operator growth', sell: 'Stalling adoption, flat contributions', weight: '15%' },
-    { factor: 'Volume', buy: '7d vol > 30d avg (expanding interest)', sell: '7d vol < 30d avg (waning interest)', weight: '10%' },
+    { factor: 'HIP-3 Catalyst', buy: 'Rising fee contribution, operator growth', sell: 'Stalling adoption, flat contributions', weight: '10%' },
+    { factor: 'Supply Pressure', buy: 'Buybacks offset >75% of unlocks', sell: 'Buybacks offset <25% (heavy dilution)', weight: '10%' },
+    { factor: 'BTC Regime', buy: 'BTC bullish + correlated, or decoupled', sell: 'BTC bearish + high correlation', weight: '5%' },
+    { factor: 'Volume', buy: '7d vol > 30d avg (expanding interest)', sell: '7d vol < 30d avg (waning interest)', weight: '5%' },
   ];
 
   return (
