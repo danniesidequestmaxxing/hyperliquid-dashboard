@@ -18,6 +18,9 @@ interface FinancialDataPoint {
   take_rate_bps: number;
   fdv: number;
   fdv_multiple: number;
+  swpe?: number;
+  circulating_supply?: number;
+  rfs_market_cap?: number;
   open_interest: number;
   hype_price: number;
   btc_price: number;
@@ -35,13 +38,15 @@ export default function FinancialsPage() {
   const latest = data[data.length - 1];
   const prev = data[data.length - 2];
   const recentFees = data.slice(-14).map(d => d.daily_fees);
-  const recentMultiples = data.slice(-14).map(d => d.fdv_multiple);
+  const recentSwpe = data.slice(-14).map(d => d.swpe || d.fdv_multiple);
   const recentVolumes = data.slice(-14).map(d => d.total_volume);
 
   const feesChange = prev.daily_fees > 0 ? ((latest.daily_fees - prev.daily_fees) / prev.daily_fees) * 100 : 0;
   const volChange = prev.total_volume > 0 ? ((latest.total_volume - prev.total_volume) / prev.total_volume) * 100 : 0;
-  const multipleChange = prev.fdv_multiple > 0
-    ? ((latest.fdv_multiple - prev.fdv_multiple) / prev.fdv_multiple) * 100 : 0;
+  const swpeChange = (prev.swpe || prev.fdv_multiple) > 0
+    ? (((latest.swpe || latest.fdv_multiple) - (prev.swpe || prev.fdv_multiple)) / (prev.swpe || prev.fdv_multiple)) * 100 : 0;
+
+  const swpeValue = latest.swpe || latest.fdv_multiple;
 
   return (
     <div className="space-y-4">
@@ -55,12 +60,12 @@ export default function FinancialsPage() {
           accentColor="#f59e0b"
         />
         <KPICard
-          label="FDV / Fees"
-          value={formatMultiple(latest.fdv_multiple)}
-          change={multipleChange}
-          subtitle="annualized"
-          sparkline={recentMultiples}
-          accentColor="#a855f7"
+          label="SWPE (Float P/E)"
+          value={formatMultiple(swpeValue)}
+          change={swpeChange}
+          subtitle="yrs of earnings to buy float"
+          sparkline={recentSwpe}
+          accentColor="#5ae9b5"
         />
         <KPICard
           label="Total Volume"

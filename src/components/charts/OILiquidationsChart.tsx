@@ -23,7 +23,7 @@ interface DataPoint {
   adl_events: number;
 }
 
-export function OILiquidationsChart({ data }: { data: DataPoint[] }) {
+export function OILiquidationsChart({ data, isSimulated = true }: { data: DataPoint[]; isSimulated?: boolean }) {
   const [range, setRange] = useState('90D');
 
   const filtered = useMemo(() => {
@@ -36,7 +36,7 @@ export function OILiquidationsChart({ data }: { data: DataPoint[] }) {
     <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Open Interest & Liquidations<SimulatedBadge /></h3>
+          <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Open Interest & Liquidations{isSimulated && <SimulatedBadge />}</h3>
           <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">Total OI (area) vs daily liquidation volume (bars)</p>
         </div>
         <TimeRangeSelector selected={range} onChange={setRange} />

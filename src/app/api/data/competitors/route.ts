@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { fetchAllDerivatives, fetchAllFees, fetchProtocolTVL, fetchDerivativesVolumeHistory, fetchCurrentPrice } from '@/lib/api/defillama';
+import { fetchAllDerivatives, fetchAllFees, fetchProtocolTVL, fetchMultiProtocolVolumes, fetchCurrentPrice } from '@/lib/api/defillama';
+import { fetchCompetitorFDVs } from '@/lib/api/coingecko';
 
 export const revalidate = 300;
 
@@ -39,8 +40,8 @@ const DEX_MAP: Record<string, { display: string; color: string; type: 'DEX' | 'C
   'Gate.io (Derivatives)': { display: 'Gate.io', color: '#2354E6', type: 'CEX' },
 };
 
-// Competitor FDVs (approximate, from Caladan comps table Jan 2026 + public data)
-const COMPETITOR_FDVS: Record<string, number> = {
+// Fallback FDVs (used only if CoinGecko API fails)
+const FALLBACK_FDVS: Record<string, number> = {
   'Hyperliquid': 0, // computed dynamically
   'Lighter': 1_790_000_000,
   'Aster': 5_060_000_000,
@@ -66,11 +67,18 @@ const TVL_SLUGS = [
 
 export async function GET() {
   try {
-    const [derivativesResult, feesResult, ...tvlResults] = await Promise.allSettled([
+    const [derivativesResult, feesResult, fdvsResult, marketShareResult, ...tvlResults] = await Promise.allSettled([
       fetchAllDerivatives(),
       fetchAllFees(),
+      fetchCompetitorFDVs(),
+      fetchMultiProtocolVolumes(),
       ...TVL_SLUGS.map(s => fetchProtocolTVL(s.slug)),
     ]);
+
+    // Live FDVs from CoinGecko (fallback to static values)
+    const liveFDVs = fdvsResult.status === 'fulfilled' ? fdvsResult.value : {};
+    const fdvsAreReal = fdvsResult.status === 'fulfilled' && Object.keys(liveFDVs).length > 0;
+    const competitorFDVs = { ...FALLBACK_FDVS, ...liveFDVs };
 
     // ── Competitor Table ──
     const derivatives = derivativesResult.status === 'fulfilled' ? derivativesResult.value : [];
@@ -139,7 +147,7 @@ export async function GET() {
 
     // ── Enrich DEX rows with FDV and valuation multiples ──
     for (const row of table) {
-      const fdv = COMPETITOR_FDVS[row.name];
+      const fdv = competitorFDVs[row.name];
       if (fdv && fdv > 0 && row.fees24h > 0) {
         row.fdv = fdv;
         row.fdvRevenueMultiple = fdv / (row.fees24h * 365);
@@ -154,15 +162,9 @@ export async function GET() {
       }
     }
 
-    // ── Historical volume chart (Hyperliquid only for now — competitor history needs daily snapshots) ──
-    let hlVolHistory: { date: string; Hyperliquid: number }[] = [];
-    try {
-      const hlHist = await fetchDerivativesVolumeHistory('hyperliquid');
-      hlVolHistory = hlHist.map(d => ({
-        date: new Date(d.timestamp * 1000).toISOString().split('T')[0],
-        Hyperliquid: d.value,
-      }));
-    } catch { /* skip */ }
+    // ── Multi-protocol volume history (for market share chart) ──
+    const marketShareHistory = marketShareResult.status === 'fulfilled' ? marketShareResult.value : [];
+    const hasRealMarketShare = marketShareHistory.length > 0;
 
     // ── TVL data ──
     const tvlData: Record<string, { date: string; [key: string]: string | number }[]> = {};
@@ -201,10 +203,12 @@ export async function GET() {
     return NextResponse.json({
       table,
       tvlHistory,
-      hlVolHistory,
+      marketShareHistory,
+      hasRealMarketShare,
       competitorSnapshot,
       tvlSlugs: TVL_SLUGS,
       hypePrice,
+      fdvsAreReal,
     });
   } catch (error) {
     console.error('Competitors API error:', error);

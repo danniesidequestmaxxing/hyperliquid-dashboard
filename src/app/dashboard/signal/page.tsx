@@ -41,10 +41,19 @@ export default function SignalPage() {
     () => generateFinancialsData(365),
     300_000
   );
-  const { data: hip3Data } = useApiData(
+  const { data: hip3ApiData } = useApiData<{ daily: ReturnType<typeof generateHIP3Data> }>(
+    '/api/data/hip3',
+    null,
+    300_000
+  );
+  const { data: hip3MockData } = useApiData(
     '__mock_hip3_signal__',
     () => generateHIP3Data(365),
   );
+  // Use real HIP-3 daily data if available, otherwise fall back to mock
+  const hip3Data = hip3ApiData?.daily && hip3ApiData.daily.length > 0
+    ? hip3ApiData.daily
+    : hip3MockData;
   const { data: supplyData } = useApiData(
     '/api/data/supply',
     () => generateSupplyData(),

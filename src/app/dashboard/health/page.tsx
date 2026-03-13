@@ -1,10 +1,10 @@
 'use client';
 
+import { useMemo } from 'react';
 import { KPICard } from '@/components/ui/kpi-card';
 import { OILiquidationsChart } from '@/components/charts/OILiquidationsChart';
-import { CapitalStickinessChart } from '@/components/charts/CapitalStickinessChart';
 import { generateNetworkHealthData } from '@/lib/mock-data';
-import { formatUSD, formatBps, formatPercent } from '@/lib/constants';
+import { formatUSD, formatBps } from '@/lib/constants';
 import { useApiData } from '@/lib/use-api-data';
 
 interface HealthApiData {
@@ -12,30 +12,44 @@ interface HealthApiData {
   totalVolume24h: number;
   avgFundingRate: number;
   fundingHeatmap: { name: string; oi: number; fundingRate: number }[];
+  history: { date: string; open_interest: number; liquidation_volume: number }[] | null;
 }
 
 export default function NetworkHealthPage() {
-  // Real-time OI and funding from HL API
+  // Real-time OI, funding, and historical data from HL + CoinGlass APIs
   const { data: healthApi, isLive } = useApiData<HealthApiData>(
     '/api/data/health',
     null,
     60_000 // Refresh every minute
   );
 
-  // Historical chart data (needs DB for real history; using mock for now)
-  const { data: chartData } = useApiData(
+  // Mock fallback for historical chart data
+  const { data: mockChartData } = useApiData(
     '__mock_health__',
     () => generateNetworkHealthData(900),
   );
+
+  // Use real CoinGlass history if available, otherwise mock
+  const chartData = useMemo(() => {
+    if (healthApi?.history && healthApi.history.length > 0) {
+      return healthApi.history.map(d => ({
+        ...d,
+        adl_events: 0,
+      }));
+    }
+    return mockChartData;
+  }, [healthApi?.history, mockChartData]);
+
+  const hasRealHistory = !!(healthApi?.history && healthApi.history.length > 0);
 
   if (!chartData) return <div className="min-h-[400px]" />;
 
   const latest = chartData[chartData.length - 1];
   const prev = chartData[chartData.length - 2];
 
-  // Use real OI if available
+  // Use real OI if available from Hyperliquid API
   const currentOI = healthApi?.totalOI || latest.open_interest;
-  const currentFunding = healthApi?.avgFundingRate ?? latest.funding_rate;
+  const currentFunding = healthApi?.avgFundingRate ?? 0;
 
   const oiChange = prev.open_interest > 0
     ? ((latest.open_interest - prev.open_interest) / prev.open_interest) * 100 : 0;
@@ -44,8 +58,6 @@ export default function NetworkHealthPage() {
 
   const recentOI = chartData.slice(-14).map(d => d.open_interest);
   const recentLiqs = chartData.slice(-14).map(d => d.liquidation_volume);
-  const recentFunding = chartData.slice(-14).map(d => d.funding_rate);
-  const recentStickiness = chartData.slice(-14).map(d => d.capital_stickiness);
 
   // Use real funding heatmap data if available
   const fundingRows = healthApi?.fundingHeatmap?.slice(0, 8) || [
@@ -61,7 +73,7 @@ export default function NetworkHealthPage() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <KPICard
           label="Total OI"
           value={formatUSD(currentOI)}
@@ -81,56 +93,45 @@ export default function NetworkHealthPage() {
         <KPICard
           label="Avg Funding Rate"
           value={formatBps(currentFunding)}
-          change={latest.funding_rate - prev.funding_rate}
+          change={0}
           subtitle={isLive ? 'live annualized' : 'annualized'}
-          sparkline={recentFunding}
+          sparkline={[]}
           accentColor="#f59e0b"
-        />
-        <KPICard
-          label="Capital Stickiness"
-          value={formatPercent(latest.capital_stickiness)}
-          change={latest.capital_stickiness - prev.capital_stickiness}
-          subtitle="retention rate"
-          sparkline={recentStickiness}
-          accentColor="#22c55e"
         />
       </div>
 
-      <OILiquidationsChart data={chartData} />
+      <OILiquidationsChart data={chartData} isSimulated={!hasRealHistory} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <CapitalStickinessChart data={latest} />
+      {/* Funding Rate Heatmap — full width */}
+      <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
+        <div className="mb-4">
+          <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Funding Rate Heatmap</h3>
+          <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">
+            Top assets by OI, current annualized funding rate
+            {isLive && <span className="text-[#5ae9b5] ml-1">LIVE</span>}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1.5">
+          {fundingRows.map((row) => {
+            const rate = row.fundingRate;
+            const intensity = Math.min(1, Math.abs(rate) / 15);
+            const bgColor = rate >= 0
+              ? `rgba(34, 197, 94, ${intensity * 0.2})`
+              : `rgba(239, 68, 68, ${intensity * 0.2})`;
+            const textColor = rate >= 0 ? '#22c55e' : '#ef4444';
 
-        <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
-          <div className="mb-4">
-            <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Funding Rate Heatmap</h3>
-            <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">
-              Top assets by OI, current annualized funding rate
-              {isLive && <span className="text-[#5ae9b5] ml-1">LIVE</span>}
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            {fundingRows.map((row) => {
-              const rate = row.fundingRate;
-              const intensity = Math.min(1, Math.abs(rate) / 15);
-              const bgColor = rate >= 0
-                ? `rgba(34, 197, 94, ${intensity * 0.2})`
-                : `rgba(239, 68, 68, ${intensity * 0.2})`;
-              const textColor = rate >= 0 ? '#22c55e' : '#ef4444';
-
-              return (
-                <div key={row.name} className="flex items-center justify-between px-3 py-2 rounded" style={{ backgroundColor: bgColor }}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono font-semibold text-[#e2e2e8] w-10">{row.name}</span>
-                    <span className="text-[10px] font-mono text-[#8888a0]">{formatUSD(row.oi)} OI</span>
-                  </div>
-                  <span className="text-xs font-mono font-semibold" style={{ color: textColor }}>
-                    {rate >= 0 ? '+' : ''}{formatBps(rate)}
-                  </span>
+            return (
+              <div key={row.name} className="flex items-center justify-between px-3 py-2 rounded" style={{ backgroundColor: bgColor }}>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono font-semibold text-[#e2e2e8] w-10">{row.name}</span>
+                  <span className="text-[10px] font-mono text-[#8888a0]">{formatUSD(row.oi)} OI</span>
                 </div>
-              );
-            })}
-          </div>
+                <span className="text-xs font-mono font-semibold" style={{ color: textColor }}>
+                  {rate >= 0 ? '+' : ''}{formatBps(rate)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

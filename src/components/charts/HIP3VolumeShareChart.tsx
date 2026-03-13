@@ -14,7 +14,6 @@ import {
 } from 'recharts';
 import { TimeRangeSelector } from './TimeRangeSelector';
 import { ChartTooltip } from './ChartTooltip';
-import { SimulatedBadge } from '@/components/ui/simulated-badge';
 import { COLORS, formatUSD, formatPercent } from '@/lib/constants';
 
 interface DataPoint {
@@ -51,7 +50,7 @@ export function HIP3VolumeShareChart({ data }: { data: DataPoint[] }) {
     <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">HIP-3 Fee Contribution<SimulatedBadge /></h3>
+          <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">HIP-3 Fee Contribution</h3>
           <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">HIP-3 protocol fees (bars) vs total HL fees (area) | contribution % (line)</p>
         </div>
         <TimeRangeSelector selected={range} onChange={setRange} />

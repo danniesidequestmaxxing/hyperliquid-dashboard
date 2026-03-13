@@ -31,6 +31,9 @@ export const BENCHMARKS = {
   HIP3_PROTOCOL_FEE_SHARE: 0.50, // 50% to protocol
   LIGHTER_TAKE_RATE_BPS: 0.46,   // Lighter's take rate for comparison
   PERP_DEX_MULTIPLE_RANGE: { low: 2, high: 29 }, // dYdX to GMX range
+  SWPE_CHEAP: 3,     // SWPE below 3 = undervalued (from Skewga/0xCryptoSam analysis)
+  SWPE_FAIR: 5,      // SWPE 3-5 = fair value range
+  SWPE_EXPENSIVE: 7, // SWPE above 7 = expensive
 } as const;
 
 // Token supply & buyback parameters (from Caladan research memo, Jan 2026)

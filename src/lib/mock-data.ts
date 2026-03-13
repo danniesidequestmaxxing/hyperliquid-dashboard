@@ -159,10 +159,6 @@ export function generateNetworkHealthData(days = 900) {
     liquidation_volume: liqs[i],
     funding_rate: rand(-2, 5),
     adl_events: Math.random() > 0.95 ? Math.floor(rand(1, 5)) : 0,
-    capital_stickiness: rand(89, 94),
-    bridged_aster: rand(3, 6),
-    bridged_lighter: rand(1, 3),
-    bridged_edgex: rand(0.5, 2),
   }));
 }
 

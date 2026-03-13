@@ -1,10 +1,32 @@
 import { NextResponse } from 'next/server';
 import { fetchFeeHistory, fetchDerivativesVolumeHistory, fetchDexVolumeHistory, fetchPriceHistory } from '@/lib/api/defillama';
+import { SUPPLY_PARAMS } from '@/lib/constants';
 
 export const revalidate = 300; // Cache for 5 minutes
 
-const HYPE_TOTAL_SUPPLY = 1_000_000_000;
-const HYPE_CIRC_RATIO = 0.336; // ~33.6% circulating
+const HYPE_TOTAL_SUPPLY = SUPPLY_PARAMS.TOTAL_SUPPLY;
+
+// Compute circulating supply for a given date, accounting for unlocks and buybacks
+function getCirculatingSupply(
+  date: string,
+  cumulativeBuybackTokens: number
+): number {
+  const unlockStart = new Date(SUPPLY_PARAMS.UNLOCK_START + '-01');
+  const d = new Date(date);
+
+  let unlockTokens = 0;
+  if (d >= unlockStart) {
+    // Months since unlock start (partial months count as full)
+    const monthsDiff =
+      (d.getFullYear() - unlockStart.getFullYear()) * 12 +
+      (d.getMonth() - unlockStart.getMonth());
+    unlockTokens = Math.max(0, monthsDiff) * SUPPLY_PARAMS.MONTHLY_UNLOCK_HYPE;
+  }
+
+  // Circulating = initial + unlocks - buybacks (floor at initial)
+  const circulating = SUPPLY_PARAMS.INITIAL_CIRCULATING + unlockTokens - cumulativeBuybackTokens;
+  return Math.max(circulating, SUPPLY_PARAMS.INITIAL_CIRCULATING);
+}
 
 export async function GET() {
   try {
@@ -33,6 +55,9 @@ export async function GET() {
     const allDates = new Set([...feeMap.keys(), ...perpMap.keys()]);
     const sortedDates = [...allDates].sort();
 
+    // Track cumulative buyback tokens for SWPE circulating supply adjustment
+    let cumulativeBuybackTokens = 0;
+
     // Build the financials array matching chart interface
     const result = sortedDates.map((date, i) => {
       const dailyFees = feeMap.get(date) || 0;
@@ -43,13 +68,26 @@ export async function GET() {
       const price = priceMap.get(date) || findClosestPrice(date, priceMap);
       const fdv = price * HYPE_TOTAL_SUPPLY;
 
-      // Compute 30d MA of daily fees for FDV multiple
+      // Accumulate buyback tokens: 99% of fees converted to HYPE at current price
+      if (price > 0) {
+        cumulativeBuybackTokens += (dailyFees * SUPPLY_PARAMS.BUYBACK_REVENUE_PCT) / price;
+      }
+
+      // Compute 30d MA of daily fees for multiples
       const startIdx = Math.max(0, i - 29);
       const recentDates = sortedDates.slice(startIdx, i + 1);
       const recentFees = recentDates.map(d => feeMap.get(d) || 0);
       const fees30dMA = recentFees.reduce((s, v) => s + v, 0) / recentFees.length;
-      const annualizedFees = fees30dMA * 365;
-      const fdvMultiple = annualizedFees > 0 ? fdv / annualizedFees : 0;
+      const annualizedRevenue = fees30dMA * 365;
+
+      // FDV / Annualized Fees (legacy metric, now secondary)
+      const fdvMultiple = annualizedRevenue > 0 ? fdv / annualizedRevenue : 0;
+
+      // SWPE: Supply-Weighted P/E = RFS Market Cap / Annualized Revenue
+      // RFS Market Cap = circulating supply × price (float-adjusted)
+      const circulatingSupply = getCirculatingSupply(date, cumulativeBuybackTokens);
+      const rfsMarketCap = circulatingSupply * price;
+      const swpe = annualizedRevenue > 0 ? rfsMarketCap / annualizedRevenue : 0;
 
       return {
         date,
@@ -60,10 +98,13 @@ export async function GET() {
         take_rate_bps: takeRateBps,
         fdv,
         fdv_multiple: fdvMultiple,
+        swpe,
+        circulating_supply: circulatingSupply,
+        rfs_market_cap: rfsMarketCap,
         open_interest: 0, // Filled from health endpoint
         hype_price: price,
         btc_price: btcMap.get(date) || findClosestPrice(date, btcMap),
-        market_cap: price * HYPE_TOTAL_SUPPLY * HYPE_CIRC_RATIO,
+        market_cap: rfsMarketCap, // Now uses actual circulating supply instead of static ratio
       };
     });
 
