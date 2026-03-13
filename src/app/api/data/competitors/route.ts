@@ -158,7 +158,7 @@ export async function GET() {
     let hlVolHistory: { date: string; Hyperliquid: number }[] = [];
     try {
       const hlHist = await fetchDerivativesVolumeHistory('hyperliquid');
-      hlVolHistory = hlHist.slice(-90).map(d => ({
+      hlVolHistory = hlHist.map(d => ({
         date: new Date(d.timestamp * 1000).toISOString().split('T')[0],
         Hyperliquid: d.value,
       }));
@@ -169,7 +169,7 @@ export async function GET() {
     TVL_SLUGS.forEach((slug, i) => {
       const result = tvlResults[i];
       if (result.status === 'fulfilled') {
-        tvlData[slug.name] = result.value.slice(-90).map(d => ({
+        tvlData[slug.name] = result.value.map(d => ({
           date: new Date(d.timestamp * 1000).toISOString().split('T')[0],
           [slug.name]: d.tvl,
         }));

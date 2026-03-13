@@ -67,20 +67,20 @@ export function generateFinancialsData(days = 365) {
   });
 }
 
-export function generateCompetitorData(days = 90) {
+export function generateCompetitorData(days = 900) {
   const dates = generateDateRange(days);
-  // DEX perp volumes ($ absolute)
-  const hlVol = randomWalk(5.2e9, days, 0.08, 0.002);
-  const lighterVol = randomWalk(2.8e9, days, 0.09, 0.003);
-  const asterVol = randomWalk(3.4e9, days, 0.07, 0.002);
-  const edgexVol = randomWalk(2.1e9, days, 0.08, 0.003);
-  const otherDexVol = randomWalk(2.5e9, days, 0.06, 0.001);
+  // DEX perp volumes ($ absolute) — start smaller for longer lookback
+  const hlVol = randomWalk(1.2e9, days, 0.06, 0.003);
+  const lighterVol = randomWalk(0.4e9, days, 0.07, 0.004);
+  const asterVol = randomWalk(0.6e9, days, 0.06, 0.003);
+  const edgexVol = randomWalk(0.3e9, days, 0.07, 0.004);
+  const otherDexVol = randomWalk(0.8e9, days, 0.05, 0.002);
   // Top 5 CEX perp volumes
-  const binanceVol = randomWalk(45e9, days, 0.05, 0.001);
-  const bybitVol = randomWalk(18e9, days, 0.06, 0.001);
-  const okxVol = randomWalk(12e9, days, 0.05, 0.001);
-  const bitgetVol = randomWalk(8e9, days, 0.06, 0.002);
-  const gateVol = randomWalk(4e9, days, 0.07, 0.001);
+  const binanceVol = randomWalk(30e9, days, 0.04, 0.001);
+  const bybitVol = randomWalk(10e9, days, 0.05, 0.001);
+  const okxVol = randomWalk(8e9, days, 0.04, 0.001);
+  const bitgetVol = randomWalk(4e9, days, 0.05, 0.002);
+  const gateVol = randomWalk(2e9, days, 0.06, 0.001);
 
   return dates.map((date, i) => ({
     date,
@@ -97,12 +97,13 @@ export function generateCompetitorData(days = 90) {
   }));
 }
 
-export function generateTVLData(days = 90) {
+export function generateTVLData(days = 900) {
   const dates = generateDateRange(days);
-  const hlTVL = randomWalk(4.7e9, days, 0.03, 0.001);
-  const asterTVL = randomWalk(1.8e9, days, 0.04, 0.003);
-  const lighterTVL = randomWalk(1.1e9, days, 0.05, 0.002);
-  const edgexTVL = randomWalk(0.4e9, days, 0.06, 0.004);
+  // Start smaller for longer lookback — grows over time
+  const hlTVL = randomWalk(0.5e9, days, 0.03, 0.003);
+  const asterTVL = randomWalk(0.2e9, days, 0.04, 0.004);
+  const lighterTVL = randomWalk(0.1e9, days, 0.05, 0.004);
+  const edgexTVL = randomWalk(0.05e9, days, 0.06, 0.005);
 
   return dates.map((date, i) => ({
     date,
@@ -113,16 +114,16 @@ export function generateTVLData(days = 90) {
   }));
 }
 
-export function generateHIP3Data(days = 90) {
+export function generateHIP3Data(days = 400) {
   const dates = generateDateRange(days);
-  const totalHLVolumes = randomWalk(5.2e9, days, 0.08, 0.002);
+  const totalHLVolumes = randomWalk(3.0e9, days, 0.06, 0.002);
   const totalHLFeeRates = randomWalk(3.74, days, 0.03);
-  // HIP-3 starts slow and ramps up
+  // HIP-3 starts slow and ramps up over time
   const baseVolShare = dates.map((_, i) => {
-    const ramp = Math.min(1, i / 60); // ramps over 60 days
-    return rand(0.5, 1.5) + ramp * rand(2, 4);
+    const ramp = Math.min(1, i / 120); // ramps over 120 days for longer lookback
+    return rand(0.3, 1.0) + ramp * rand(2, 4);
   });
-  const operators = dates.map((_, i) => Math.min(20, Math.floor(3 + i / 10)));
+  const operators = dates.map((_, i) => Math.min(20, Math.floor(2 + i / 20)));
 
   return dates.map((date, i) => {
     const hip3Volume = baseVolShare[i] / 100 * totalHLVolumes[i];
@@ -146,10 +147,11 @@ export function generateHIP3Data(days = 90) {
   });
 }
 
-export function generateNetworkHealthData(days = 90) {
+export function generateNetworkHealthData(days = 900) {
   const dates = generateDateRange(days);
-  const oi = randomWalk(7.5e9, days, 0.06);
-  const liqs = randomWalk(45e6, days, 0.25);
+  // Start lower for longer lookback — OI grew substantially over 2+ years
+  const oi = randomWalk(1.5e9, days, 0.04, 0.003);
+  const liqs = randomWalk(15e6, days, 0.20, 0.001);
 
   return dates.map((date, i) => ({
     date,

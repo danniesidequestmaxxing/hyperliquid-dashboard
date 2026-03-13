@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { MarketShareChart } from '@/components/charts/MarketShareChart';
 import { BridgeTVLChart } from '@/components/charts/BridgeTVLChart';
 import { CompetitorTable } from '@/components/charts/CompetitorTable';
@@ -21,23 +22,26 @@ export default function CompetitivePage() {
     300_000
   );
 
-  // Use mock data as fallback for charts that need historical series
+  // Use mock data as fallback for market share chart (no real historical volume API available)
   const { data: mockShareData } = useApiData(
-    '__mock__', // Won't actually fetch
-    () => generateCompetitorData(180),
-  );
-  const { data: mockTvlData } = useApiData(
-    '__mock_tvl__',
-    () => generateTVLData(180),
+    '__mock__',
+    () => generateCompetitorData(900),
   );
 
   // Use real table data if available, otherwise mock
   const tableData = apiData?.table && apiData.table.length > 0 ? apiData.table : getCompetitorTable();
-  // Historical TVL/competitor volumes need daily DB snapshots; using mock for charts
-  const tvlData = mockTvlData;
+
+  // Use real TVL data from API (DefiLlama), fallback to extended mock
+  const tvlData = useMemo(() => {
+    if (apiData?.tvlHistory && apiData.tvlHistory.length > 0) {
+      return apiData.tvlHistory as { date: string; Hyperliquid: number; Aster: number; Lighter: number; edgeX: number }[];
+    }
+    return generateTVLData(900);
+  }, [apiData?.tvlHistory]);
+
   const shareData = mockShareData;
 
-  if (!shareData || !tvlData) return <div className="min-h-[400px]" />;
+  if (!shareData) return <div className="min-h-[400px]" />;
 
   return (
     <div className="space-y-4">

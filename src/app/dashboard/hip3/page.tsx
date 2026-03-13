@@ -11,7 +11,7 @@ export default function HIP3Page() {
   // HIP-3 specific data requires builder fills CSV parsing — using estimates for now
   const { data } = useApiData(
     '__mock_hip3__',
-    () => generateHIP3Data(180),
+    () => generateHIP3Data(400),
   );
 
   if (!data) return <div className="min-h-[400px]" />;

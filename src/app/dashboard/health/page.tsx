@@ -25,7 +25,7 @@ export default function NetworkHealthPage() {
   // Historical chart data (needs DB for real history; using mock for now)
   const { data: chartData } = useApiData(
     '__mock_health__',
-    () => generateNetworkHealthData(180),
+    () => generateNetworkHealthData(900),
   );
 
   if (!chartData) return <div className="min-h-[400px]" />;

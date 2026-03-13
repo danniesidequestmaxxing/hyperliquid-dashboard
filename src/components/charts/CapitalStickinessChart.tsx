@@ -11,6 +11,7 @@ import {
   Cell,
 } from 'recharts';
 import { ChartTooltip } from './ChartTooltip';
+import { SimulatedBadge } from '@/components/ui/simulated-badge';
 import { COLORS, formatPercent } from '@/lib/constants';
 
 interface StickinessData {
@@ -38,7 +39,7 @@ export function CapitalStickinessChart({ data }: { data: StickinessData }) {
   return (
     <div className="rounded-lg border border-[#1e1e2e] bg-[#111117] p-4">
       <div className="mb-4">
-        <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Capital Stickiness</h3>
+        <h3 className="text-xs font-mono font-semibold text-[#e2e2e8] uppercase tracking-wider">Capital Stickiness<SimulatedBadge /></h3>
         <p className="text-[10px] font-mono text-[#8888a0] mt-0.5">% of HL addresses that bridged to each competitor vs retained</p>
       </div>
 
